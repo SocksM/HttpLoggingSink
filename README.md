@@ -88,7 +88,7 @@ curl -v `
   -H "X-Api-Key: SuperLongAndSecureApiKey" `
   -d '{
     "logLevel": 2,
-    "logMessage": "Test log with 2 test args: {str-arg} {funny-number}!"
+    "logMessage": "Test log with 2 test args: {str-arg} {funny-number}!",
     "logSource": "Test",
     "logArgs": ["test arg", 420]
   }'
