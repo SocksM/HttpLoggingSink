@@ -82,10 +82,10 @@ docker compose up -d
 The -d is for daemon, we probably dont want to keep it in the foreground lol
 9. Now to see if it's all working we are going to send a test log.
 ```shell
-curl -v `
-  -X POST http://localhost:62847/log `
-  -H "Content-Type: application/json" `
-  -H "X-Api-Key: SuperLongAndSecureApiKey" `
+curl -v \
+  -X POST http://localhost:62847/log \
+  -H "Content-Type: application/json" \
+  -H "X-Api-Key: SuperLongAndSecureApiKey" \
   -d '{
     "logLevel": 2,
     "logMessage": "Test log with 2 test args: {str-arg} {funny-number}!",
