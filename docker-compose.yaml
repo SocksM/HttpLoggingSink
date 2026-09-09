@@ -38,7 +38,7 @@
         hard: 65535
 
   elasticsearch-init:
-    image: curlimages/curl:8.16.0
+    image: alpine:3.22
     container_name: elasticsearch-init
     restart: "no"
 
@@ -54,42 +54,71 @@
       KIBANA_SYSTEM_PASSWORD: ${KIBANA_SYSTEM_PASSWORD}
       HTTPLOGGINGSINK_PASSWORD: ${HTTPLOGGINGSINK_PASSWORD}
 
-    entrypoint: ["/bin/sh", "-c"]
+    entrypoint:
+      - /bin/sh
+      - -c
 
-    command: |
-      set -e
-      echo "Configuring Elasticsearch..."
+    command:
+      - |
+        set -eu
+        set +x
 
-      curl -fsS \
-        -u "elastic:$${ELASTIC_PASSWORD}" \
-        -X PUT \
-        "http://elasticsearch:9200/_security/user/kibana_system/_password" \
-        -H "Content-Type: application/json" \
-        -d "{\"password\":\"$${KIBANA_SYSTEM_PASSWORD}\"}"
+        apk add --no-cache curl
 
-      curl -fsS \
-        -u "elastic:$${ELASTIC_PASSWORD}" \
-        -X PUT \
-        "http://elasticsearch:9200/_security/role/httploggingsink" \
-        -H "Content-Type: application/json" \
-        -d '{
-          "cluster": ["manage"],
-          "indices": [
-            {
-              "names": ["logs-http-log-*"],
-              "privileges": ["create_index", "create", "index", "write"]
-            }
-          ]
-        }'
+        echo "Checking Elasticsearch..."
+        curl --fail-with-body -sS \
+          -u "elastic:$${ELASTIC_PASSWORD}" \
+          "http://elasticsearch:9200/_cluster/health"
+        echo
 
-      curl -fsS \
-        -u "elastic:$${ELASTIC_PASSWORD}" \
-        -X PUT \
-        "http://elasticsearch:9200/_security/user/httploggingsink" \
-        -H "Content-Type: application/json" \
-        -d "{\"password\":\"$${HTTPLOGGINGSINK_PASSWORD}\",\"roles\":[\"httploggingsink\"]}"
+        echo "Configuring kibana_system..."
+        curl --fail-with-body -sS \
+          -u "elastic:$${ELASTIC_PASSWORD}" \
+          -X PUT \
+          "http://elasticsearch:9200/_security/user/kibana_system/_password" \
+          -H "Content-Type: application/json" \
+          -d "{\"password\":\"$${KIBANA_SYSTEM_PASSWORD}\"}"
+        echo
 
-      echo "Elasticsearch configuration complete."
+        echo "Configuring HTTP logging sink role..."
+        curl --fail-with-body -sS \
+          -u "elastic:$${ELASTIC_PASSWORD}" \
+          -X PUT \
+          "http://elasticsearch:9200/_security/role/httploggingsink" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "cluster": ["manage"],
+            "indices": [
+              {
+                "names": ["logs-http-log-*"],
+                "privileges": ["create_index", "create", "index", "write"]
+              }
+            ]
+          }'
+        echo
+
+        echo "Configuring HTTP logging sink user..."
+        curl --fail-with-body -sS \
+          -u "elastic:$${ELASTIC_PASSWORD}" \
+          -X PUT \
+          "http://elasticsearch:9200/_security/user/httploggingsink" \
+          -H "Content-Type: application/json" \
+          -d "{\"password\":\"$${HTTPLOGGINGSINK_PASSWORD}\",\"roles\":[\"httploggingsink\"]}"
+        echo
+
+        echo "Verifying kibana_system authentication..."
+        curl --fail-with-body -sS \
+          -u "kibana_system:$${KIBANA_SYSTEM_PASSWORD}" \
+          "http://elasticsearch:9200/_security/_authenticate"
+        echo
+
+        echo "Verifying httploggingsink authentication..."
+        curl --fail-with-body -sS \
+          -u "httploggingsink:$${HTTPLOGGINGSINK_PASSWORD}" \
+          "http://elasticsearch:9200/_security/_authenticate"
+        echo
+
+        echo "Elasticsearch configuration complete."
 
   http-logging-sink:
     image: ghcr.io/socksm/http-logging-sink-main:latest
@@ -107,6 +136,9 @@
     networks:
       - elastic
 
+    volumes:
+      - ${HTTP_LOGGING_SINK_CONFIG}:/app/appsettings.Production.json:ro
+
     depends_on:
       elasticsearch-init:
         condition: service_completed_successfully
@@ -117,6 +149,7 @@
     restart: unless-stopped
 
     environment:
+      - ASPNETCORE_ENVIRONMENT=Production
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - ELASTICSEARCH_USERNAME=kibana_system
       - ELASTICSEARCH_PASSWORD=${KIBANA_SYSTEM_PASSWORD}
