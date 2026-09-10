@@ -71,6 +71,9 @@ HTTPLOGGINGSINK_PASSWORD=SuperLongAndSecureHttpLogSinkPassword
 # Path to your appsettings.json
 HTTP_LOGGING_SINK_CONFIG=/home/my-user/http-logging-sink-tutorial/appsettings.json
 ```
+> [!TIP]  
+> You can run `openssl rand -hex 20` to create a crypto secure string of 20 hexadecimal bytes (same can be done with `-base64` instead if you prefer that)
+
 7. Now just copy the docker compose
 ```shell
 cp HttpLoggingSink/docker-compose.yaml docker-compose.yaml
